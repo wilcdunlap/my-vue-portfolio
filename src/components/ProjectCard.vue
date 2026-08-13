@@ -15,6 +15,15 @@
         {{ isExpanded ? 'Hide Quick Preview' : 'Preview Recent Posts' }}
       </button>
 
+      <!-- Only shows button if a #details slot was provided -->
+      <button 
+        v-if="$slots.details" 
+        @click="detailsExpanded = !detailsExpanded" 
+        class="toggle-btn"
+      >
+        {{ detailsExpanded ? 'Hide Bot Details' : 'View Bot Details' }}
+      </button>
+
       <router-link :to="`/project/${slug}`" class="full-page-link">
         Full Page Feed & History &rarr;
       </router-link>
@@ -36,6 +45,13 @@
       </div>
       <p v-else class="no-posts">No recent posts loaded.</p>
     </div>
+
+    <!-- Details Drawer (Slot Target) -->
+    <div v-if="detailsExpanded && $slots.details" class="posts-drawer">
+      <slot name="details" />
+    </div>
+
+    
   </div>
 </template>
 
@@ -52,6 +68,7 @@ defineProps({
 })
 
 const isExpanded = ref(false)
+const detailsExpanded = ref(false)
 </script>
 
 <style scoped>
