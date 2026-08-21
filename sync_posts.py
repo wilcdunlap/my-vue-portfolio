@@ -18,7 +18,7 @@ BOT_CONFIGURATIONS = {
     }
 }
 
-JSON_OUTPUT_PATH = "public/posts.json"
+#JSON_OUTPUT_PATH = "public/posts.json"
 
 def fetch_recent_posts(page_id: str, access_token: str, limit: int = 5) -> list:
     """Fetch recent posts for a specific Facebook Page using Graph API."""
@@ -37,11 +37,10 @@ def fetch_recent_posts(page_id: str, access_token: str, limit: int = 5) -> list:
         formatted_posts = []
         for item in data:
             formatted_posts.append({
-                'id': item.get('id'),
+                # Omit 'id' so PostgreSQL manages primary keys cleanly
                 'date': item.get('created_time', '')[:10],
                 'content': item.get('message', 'No text content'),
-                'image': item.get('full_picture', None),
-                'url': item.get('permalink_url', '#')
+                'image': item.get('full_picture', None)
             })
         return formatted_posts
 
@@ -55,15 +54,6 @@ def update_bot_json(target_slug: str = None):
     If target_slug is provided, only updates that specific bot.
     If target_slug is None, updates all configured bots.
     """
-    # Load existing JSON if it exists to avoid overwriting unrelated bot data
-    existing_data = {}
-    if os.path.exists(JSON_OUTPUT_PATH):
-        try:
-            with open(JSON_OUTPUT_PATH, 'r', encoding='utf-8') as f:
-                existing_data = json.load(f)
-        except json.JSONDecodeError:
-            existing_data = {}
-
     configs_to_run = (
         {target_slug: BOT_CONFIGURATIONS[target_slug]} 
         if target_slug and target_slug in BOT_CONFIGURATIONS 
@@ -78,14 +68,23 @@ def update_bot_json(target_slug: str = None):
             
         print(f"Syncing posts for '{slug}'...")
         posts = fetch_recent_posts(config["page_id"], token)
-        existing_data[slug] = posts
+        
+        # --- NEW MICROSERVICE CONNECTION ---
+        # Instead of saving to a JSON file, send the data directly to PostgreSQL via .NET
+        try:
+            api_url = f"http://localhost:5151/api/projects/{slug}/posts"
+            response = requests.post(api_url, json=posts)
+            response.raise_for_status()
+            print(f"✅ Successfully saved {len(posts)} posts to PostgreSQL for {slug}!")
+        except Exception as e:
+            print(f"❌ Failed to send data to .NET API for {slug}: {e}")
 
     # Ensure the public directory exists and save
-    os.makedirs(os.path.dirname(JSON_OUTPUT_PATH), exist_ok=True)
-    with open(JSON_OUTPUT_PATH, 'w', encoding='utf-8') as f:
-        json.dump(existing_data, f, indent=2)
+#    os.makedirs(os.path.dirname(JSON_OUTPUT_PATH), exist_ok=True)
+#    with open(JSON_OUTPUT_PATH, 'w', encoding='utf-8') as f:
+#        json.dump(existing_data, f, indent=2)
         
-    print(f"Updated {JSON_OUTPUT_PATH} successfully!")
+#    print(f"Updated {JSON_OUTPUT_PATH} successfully!")
 
 if __name__ == "__main__":
     # When run directly from terminal, sync all configured bots
